@@ -14,11 +14,10 @@ import (
 
 func (dk *Deathknight) ApplyBloodTalents() {
 	// Butchery
-	// Pointless to Implement - RaiN: Gives you passive 1 * rank runic power per 5 seconds so it needs to be implemented
 	dk.applyButchery()
 
 	// Subversion
-	// TODO: Implement
+	// Implemented outside
 
 	// Blade barrier
 	dk.applyBladeBarrier()
@@ -54,7 +53,7 @@ func (dk *Deathknight) ApplyBloodTalents() {
 	// TODO: Implement
 
 	// Bloody Strikes
-	// TODO: Implement
+	// Implemented
 
 	// Veteran of the Third War
 	if dk.Talents.VeteranOfTheThirdWar > 0 {
@@ -69,14 +68,27 @@ func (dk *Deathknight) ApplyBloodTalents() {
 	// Mark of Blood
 	// TODO: Implement
 
-	// Bloody Vengeance
-	// TODO: Implement
+	dk.applyBloodyVengeance()
+	dk.applySuddenDoom()
 
 	// Abomination's Might
 	if dk.Talents.AbominationsMight > 0 {
 		strengthCoeff := 0.01 * float64(dk.Talents.AbominationsMight)
 		dk.AddStatDependency(stats.Strength, stats.Strength, 1.0+strengthCoeff)
 	}
+
+	dk.applyBloodGorged()
+}
+
+func (dk *Deathknight) bloodyStrikesBonus(spell *RuneSpell) float64 {
+	if spell == dk.BloodStrike {
+		return []float64{1.0, 1.05, 1.1, 1.15}[dk.Talents.BloodyStrikes]
+	} else if spell == dk.HeartStrike {
+		return []float64{1.0, 1.15, 1.3, 1.45}[dk.Talents.BloodyStrikes]
+	} else if spell == dk.BloodBoil {
+		return []float64{1.0, 1.1, 1.2, 1.3}[dk.Talents.BloodyStrikes]
+	}
+	return 1.0
 }
 
 func (dk *Deathknight) subversionThreatBonus() float64 {
@@ -89,6 +101,10 @@ func (dk *Deathknight) subversionCritBonus() float64 {
 
 func (dk *Deathknight) improvedDeathStrikeCritBonus() float64 {
 	return 3.0 * float64(dk.Talents.ImprovedDeathStrike)
+}
+
+func (dk *Deathknight) improvedDeathStrikeDamageBonus() float64 {
+	return 1.0 + 0.15*float64(dk.Talents.ImprovedDeathStrike)
 }
 
 func (dk *Deathknight) applyBladeBarrier() {
@@ -142,6 +158,111 @@ func (dk *Deathknight) applyButchery() {
 			})
 		},
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
+		},
+	}))
+}
+
+func (dk *Deathknight) applyBloodyVengeance() {
+	if dk.Talents.BloodyVengeance == 0 {
+		return
+	}
+
+	actionID := core.ActionID{SpellID: 50449}
+	physBonus := float64(dk.Talents.BloodyVengeance) * 0.01
+
+	procAura := dk.RegisterAura(core.Aura{
+		ActionID:  actionID,
+		Label:     "Bloody Vengeance Proc",
+		MaxStacks: 3,
+		Duration:  30 * time.Second,
+		OnStacksChange: func(aura *core.Aura, sim *core.Simulation, oldStacks, newStacks int32) {
+			aura.Unit.PseudoStats.PhysicalDamageDealtMultiplier /= 1.0 + float64(oldStacks)*physBonus
+			aura.Unit.PseudoStats.PhysicalDamageDealtMultiplier *= 1.0 + float64(newStacks)*physBonus
+		},
+	})
+
+	core.MakePermanent(dk.RegisterAura(core.Aura{
+		ActionID: actionID,
+		Label:    "Bloody Vengeance",
+		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			if !spellEffect.Outcome.Matches(core.OutcomeCrit) {
+				return
+			}
+
+			if !spellEffect.ProcMask.Matches(core.ProcMaskDirect) {
+				return
+			}
+
+			procAura.Activate(sim)
+			procAura.AddStack(sim)
+		},
+	}))
+}
+
+func (dk *Deathknight) applySuddenDoom() {
+	if dk.Talents.SuddenDoom == 0 {
+		return
+	}
+
+	procChance := 0.05 * float64(dk.Talents.SuddenDoom)
+
+	dk.SuddenDoomAura = dk.RegisterAura(core.Aura{
+		Label:    "Sudden Doom Proc",
+		ActionID: core.ActionID{SpellID: 49530},
+		Duration: core.NeverExpires,
+	})
+
+	core.MakePermanent(dk.RegisterAura(core.Aura{
+		Label: "Sudden Doom",
+		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			if !spellEffect.Landed() {
+				return
+			}
+
+			if spell != dk.HeartStrike.Spell && spell != dk.BloodStrike.Spell {
+				return
+			}
+
+			if sim.RandomFloat("Sudden Doom Proc") < procChance {
+				dk.SuddenDoomAura.Activate(sim)
+				dk.DeathCoil.Cast(sim, dk.CurrentTarget)
+				dk.SuddenDoomAura.Deactivate(sim)
+			}
+		},
+	}))
+}
+
+func (dk *Deathknight) applyBloodGorged() {
+	if dk.Talents.BloodGorged == 0 {
+		return
+	}
+
+	bonusDamage := 1.1
+	armorPenRating := 10.0 * core.ArmorPenPerPercentArmor
+
+	procAura := core.MakePermanent(dk.RegisterAura(core.Aura{
+		Label:    "Blood Gorged Proc",
+		ActionID: core.ActionID{SpellID: 50111},
+		OnGain: func(aura *core.Aura, sim *core.Simulation) {
+			aura.Unit.PseudoStats.DamageDealtMultiplier *= bonusDamage
+			aura.Unit.PseudoStats.BonusMHArmorPenRating += armorPenRating
+		},
+		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
+			aura.Unit.PseudoStats.DamageDealtMultiplier /= bonusDamage
+			aura.Unit.PseudoStats.BonusMHArmorPenRating -= armorPenRating
+		},
+	}))
+
+	core.MakePermanent(dk.RegisterAura(core.Aura{
+		Label: "Blood Gorged",
+		OnSpellHitTaken: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			isActive := procAura.IsActive()
+			shouldBeActive := aura.Unit.CurrentHealthPercent() >= 0.75
+			if isActive && !shouldBeActive {
+				procAura.Deactivate(sim)
+			} else if !isActive && shouldBeActive {
+				procAura.Activate(sim)
+			}
 		},
 	}))
 }

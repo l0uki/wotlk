@@ -24,7 +24,12 @@ func (dk *Deathknight) registerDeathCoilSpell() {
 				Cost: baseCost,
 			},
 			ModifyCast: func(sim *core.Simulation, spell *core.Spell, cast *core.Cast) {
-				cast.GCD = dk.getModifiedGCD()
+				if dk.SuddenDoomAura.IsActive() {
+					cast.Cost = 0 // no runes, no regen
+					cast.GCD = 0  // no GCD
+				} else {
+					cast.GCD = dk.getModifiedGCD()
+				}
 			},
 		},
 

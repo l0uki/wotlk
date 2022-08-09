@@ -30,7 +30,7 @@ func (rs *RuneSpell) Cast(sim *core.Simulation, target *core.Unit) bool {
 	rs.dk.LastCast = rs
 	cost := core.RuneCost(rs.Spell.CurCast.Cost)
 	// Spend now if there is no way to refund the spell
-	if !cost.HasRune() || !rs.Refundable {
+	if /*!cost.HasRune() || */ !rs.Refundable {
 		rs.Spell.Unit.SpendRuneCost(sim, rs.Spell, cost)
 	}
 

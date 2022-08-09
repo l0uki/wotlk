@@ -50,6 +50,9 @@ type Deathknight struct {
 	Gargoyle       *GargoylePet
 	SummonGargoyle *RuneSpell
 
+	RuneWeapon        *RuneWeaponPet
+	DancingRuneWeapon *RuneSpell
+
 	ArmyOfTheDead *RuneSpell
 	ArmyGhoul     []*GhoulPet
 
@@ -78,6 +81,9 @@ type Deathknight struct {
 	FrostStrike      *RuneSpell
 	FrostStrikeMhHit *RuneSpell
 	FrostStrikeOhHit *RuneSpell
+
+	HeartStrike       *RuneSpell
+	HeartStrikeOffHit *RuneSpell
 
 	GhoulFrenzy *RuneSpell
 	// Dummy aura for timeline metrics
@@ -136,6 +142,7 @@ type Deathknight struct {
 	ButcheryPA          *core.PendingAction
 	RimeAura            *core.Aura
 	BladeBarrierAura    *core.Aura
+	SuddenDoomAura      *core.Aura
 
 	// Talent Spells
 	LastDiseaseDamage float64
@@ -222,10 +229,12 @@ func (dk *Deathknight) Initialize() {
 	dk.registerRuneTapSpell()
 	dk.registerIceboundFortitudeSpell()
 	dk.registerDeathStrikeSpell()
+	dk.registerHeartStrikeSpell()
 
 	dk.registerRaiseDeadCD()
 	dk.registerSummonGargoyleCD()
 	dk.registerArmyOfTheDeadCD()
+	dk.registerDancingRuneWeaponCD()
 }
 
 func (dk *Deathknight) ResetBonusCoeffs() {
@@ -351,6 +360,8 @@ func NewDeathknight(character core.Character, talents proto.DeathknightTalents, 
 	for i := 0; i < 8; i++ {
 		dk.ArmyGhoul[i] = dk.NewArmyGhoulPet(i)
 	}
+
+	dk.RuneWeapon = dk.NewRuneWeapon()
 
 	dk.Opener = &Sequence{}
 	dk.Main = &Sequence{}
@@ -484,6 +495,10 @@ func (dk *Deathknight) CanCast(sim *core.Simulation, spell *RuneSpell) bool {
 		return dk.CanHornOfWinter(sim)
 	case dk.RaiseDead:
 		return dk.CanRaiseDead(sim)
+	case dk.HeartStrike:
+		return dk.CanHeartStrike(sim)
+	case dk.DeathStrike:
+		return dk.CanDeathStrike(sim)
 	default:
 		panic("Not in cost list.")
 	}

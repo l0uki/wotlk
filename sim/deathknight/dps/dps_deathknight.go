@@ -26,6 +26,7 @@ func RegisterDpsDeathknight() {
 type DpsDeathknight struct {
 	*deathknight.Deathknight
 
+	sr SharedRotation
 	fr FrostRotation
 	ur UnholyRotation
 
@@ -49,6 +50,7 @@ func NewDpsDeathknight(character core.Character, player proto.Player) *DpsDeathk
 		Rotation: *dk.Rotation,
 	}
 
+	dpsDk.sr.dk = dpsDk
 	dpsDk.ur.dk = dpsDk
 
 	return dpsDk
@@ -82,6 +84,8 @@ func (dk *DpsDeathknight) SetupRotations() {
 		}
 	} else if dk.Talents.SummonGargoyle {
 		dk.setupUnholyRotations()
+	} else if dk.Talents.DancingRuneWeapon {
+		dk.setupBloodRotations()
 	} else {
 		// TODO: Add some default rotation that works without special talents
 		if dk.Rotation.UseEmpowerRuneWeapon {
@@ -112,6 +116,7 @@ func (dk *DpsDeathknight) Reset(sim *core.Simulation) {
 		dk.ChangePresence(sim, deathknight.BloodPresence)
 	}
 
+	dk.sr.Reset(sim)
 	dk.fr.Reset(sim)
 	dk.ur.Reset(sim)
 

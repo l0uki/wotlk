@@ -96,6 +96,14 @@ func (dk *Deathknight) RotationActionCallback_BS(sim *core.Simulation, target *c
 	return casted
 }
 
+func (dk *Deathknight) RotationActionCallback_HS(sim *core.Simulation, target *core.Unit, s *Sequence) bool {
+	casted := dk.CastHeartStrike(sim, target)
+	advance := dk.LastOutcome.Matches(core.OutcomeLanded)
+
+	s.ConditionalAdvance(casted && advance)
+	return casted
+}
+
 func (dk *Deathknight) RotationActionCallback_BB(sim *core.Simulation, target *core.Unit, s *Sequence) bool {
 	casted := dk.BloodBoil.Cast(sim, target)
 	advance := dk.LastOutcome.Matches(core.OutcomeLanded)

@@ -5,6 +5,7 @@ import (
 
 	//"time"
 
+	"math"
 	"time"
 
 	"github.com/wowsims/wotlk/sim/core"
@@ -68,6 +69,7 @@ func (dk *Deathknight) ApplyBloodTalents() {
 	// Mark of Blood
 	// TODO: Implement
 
+	dk.applyBloodworms()
 	dk.applyBloodyVengeance()
 	dk.applySuddenDoom()
 
@@ -239,17 +241,18 @@ func (dk *Deathknight) applyBloodGorged() {
 
 	bonusDamage := 1.1
 	armorPenRating := 10.0 * core.ArmorPenPerPercentArmor
+	bonusStats := stats.Stats{stats.ArmorPenetration: armorPenRating}
 
 	procAura := core.MakePermanent(dk.RegisterAura(core.Aura{
 		Label:    "Blood Gorged Proc",
 		ActionID: core.ActionID{SpellID: 50111},
 		OnGain: func(aura *core.Aura, sim *core.Simulation) {
 			aura.Unit.PseudoStats.DamageDealtMultiplier *= bonusDamage
-			aura.Unit.PseudoStats.BonusMHArmorPenRating += armorPenRating
+			aura.Unit.AddStatsDynamic(sim, bonusStats)
 		},
 		OnExpire: func(aura *core.Aura, sim *core.Simulation) {
 			aura.Unit.PseudoStats.DamageDealtMultiplier /= bonusDamage
-			aura.Unit.PseudoStats.BonusMHArmorPenRating -= armorPenRating
+			aura.Unit.AddStatsDynamic(sim, bonusStats.Multiply(-1))
 		},
 	}))
 
@@ -262,6 +265,49 @@ func (dk *Deathknight) applyBloodGorged() {
 				procAura.Deactivate(sim)
 			} else if !isActive && shouldBeActive {
 				procAura.Activate(sim)
+			}
+		},
+	}))
+}
+
+func (dk *Deathknight) applyBloodworms() {
+	if dk.Talents.Bloodworms == 0 {
+		return
+	}
+
+	procChance := 0.03 * float64(dk.Talents.Bloodworms)
+	icd := core.Cooldown{
+		Timer:    dk.NewTimer(),
+		Duration: time.Second * 20,
+	}
+
+	// For tracking purposes
+	procSpell := dk.RegisterSpell(nil, core.SpellConfig{
+		ActionID: core.ActionID{SpellID: 49543},
+		ApplyEffects: func(sim *core.Simulation, _ *core.Unit, _ *core.Spell) {
+			// Summon Bloodworms
+			random := int(math.Round(sim.RandomFloat("Bloodworms count")*2.0)) + 2
+			for i := 0; i < random; i++ {
+				dk.Bloodworm[i].EnableWithTimeout(sim, dk.Bloodworm[i], time.Second*20)
+				dk.Bloodworm[i].CancelGCDTimer(sim)
+			}
+		},
+	})
+
+	core.MakePermanent(dk.RegisterAura(core.Aura{
+		Label: "Bloodworms Proc",
+		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			if !spellEffect.ProcMask.Matches(core.ProcMaskMelee) {
+				return
+			}
+
+			if !icd.IsReady(sim) {
+				return
+			}
+
+			if sim.RandomFloat("Bloodworms proc") < procChance {
+				icd.Use(sim)
+				procSpell.Cast(sim, spellEffect.Target)
 			}
 		},
 	}))

@@ -62,7 +62,7 @@ func (dk *Deathknight) NewGhoulPet(permanent bool) *GhoulPet {
 		Pet: core.NewPet(
 			"Ghoul",
 			&dk.Character,
-			ghoulPetBaseStats,
+			bloodwormPetBaseStats,
 			dk.ghoulStatInheritance(),
 			permanent,
 			!permanent,

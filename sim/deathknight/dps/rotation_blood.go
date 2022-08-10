@@ -11,6 +11,15 @@ func (dk *DpsDeathknight) setupBloodRotations() {
 	dk.Opener.Clear().
 		NewAction(dk.RotationActionCallback_IT).
 		NewAction(dk.RotationActionCallback_PS).
+		NewAction(dk.RotationActionCallback_HS).
+		NewAction(dk.RotationActionCallback_DS).
+		NewAction(dk.RotationActionCallback_HS).
+		NewAction(dk.RotationActionCallback_ERW).
+		NewAction(dk.RotationActionCallback_DRW).
+		NewAction(dk.RotationActionCallback_IT).
+		NewAction(dk.RotationActionCallback_PS).
+		NewAction(dk.RotationActionCallback_HS).
+		NewAction(dk.RotationActionCallback_DS).
 		NewAction(dk.RotationActionCallback_HS)
 
 	dk.Main.NewAction(dk.RotationActionCallback_BloodRotation)

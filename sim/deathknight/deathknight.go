@@ -56,6 +56,8 @@ type Deathknight struct {
 	ArmyOfTheDead *RuneSpell
 	ArmyGhoul     []*GhoulPet
 
+	Bloodworm []*BloodwormPet
+
 	Presence Presence
 
 	IcyTouch   *RuneSpell
@@ -359,6 +361,11 @@ func NewDeathknight(character core.Character, talents proto.DeathknightTalents, 
 	dk.ArmyGhoul = make([]*GhoulPet, 8)
 	for i := 0; i < 8; i++ {
 		dk.ArmyGhoul[i] = dk.NewArmyGhoulPet(i)
+	}
+
+	dk.Bloodworm = make([]*BloodwormPet, 4)
+	for i := 0; i < 4; i++ {
+		dk.Bloodworm[i] = dk.NewBloodwormPet(i)
 	}
 
 	dk.RuneWeapon = dk.NewRuneWeapon()

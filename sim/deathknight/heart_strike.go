@@ -7,24 +7,31 @@ import (
 
 var HeartStrikeActionID = core.ActionID{SpellID: 55050}
 
-func (dk *Deathknight) newHeartStrikeSpell(isMainTarget bool, onhit func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect)) *RuneSpell {
+func (dk *Deathknight) newHeartStrikeSpell(isMainTarget bool, isDrw bool, onhit func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect)) *RuneSpell {
 	weaponBaseDamage := core.BaseDamageFuncMeleeWeapon(core.MainHand, true, 250.0, 1.0, 0.5, true)
 	if !isMainTarget {
 		weaponBaseDamage = core.BaseDamageFuncMeleeWeapon(core.MainHand, true, 250.0, 1.0, 0.25, true)
 	}
 
-	diseaseMulti := dk.diseaseMultiplier(0.1)
+	diseaseMulti := dk.dkDiseaseMultiplier(0.1)
+
+	outcomeApplier := dk.OutcomeFuncMeleeSpecialHitAndCrit(dk.critMultiplierGoGandMoM())
+	if isDrw {
+		outcomeApplier = dk.RuneWeapon.OutcomeFuncMeleeSpecialHitAndCrit(
+			dk.RuneWeapon.MeleeCritMultiplier(1.0, dk.secondaryCritModifier(dk.Talents.GuileOfGorefiend > 0, dk.Talents.MightOfMograine > 0)))
+	}
 
 	effect := core.SpellEffect{
 		ProcMask:         core.ProcMaskMeleeSpecial,
 		BonusCritRating:  (dk.subversionCritBonus() + dk.annihilationCritBonus()) * core.CritRatingPerCritChance,
 		DamageMultiplier: dk.thassariansPlateDamageBonus() * dk.scourgelordsBattlegearDamageBonus(dk.HeartStrike) * dk.bloodyStrikesBonus(dk.HeartStrike),
 		ThreatMultiplier: 1,
-		OutcomeApplier:   dk.OutcomeFuncMeleeSpecialHitAndCrit(dk.critMultiplierGoGandMoM()),
+		OutcomeApplier:   outcomeApplier,
 		BaseDamage: core.BaseDamageConfig{
 			Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
+				activeDiseases := core.TernaryFloat64(isDrw, dk.drwCountActiveDiseases(hitEffect.Target), dk.dkCountActiveDiseases(hitEffect.Target))
 				return weaponBaseDamage(sim, hitEffect, spell) *
-					(1.0 + dk.countActiveDiseases(hitEffect.Target)*diseaseMulti)
+					(1.0 + activeDiseases*diseaseMulti)
 			},
 			TargetSpellCoefficient: 1,
 		},
@@ -38,7 +45,7 @@ func (dk *Deathknight) newHeartStrikeSpell(isMainTarget bool, onhit func(sim *co
 		ApplyEffects: core.ApplyEffectFuncDirectDamage(effect),
 	}
 	rs := &RuneSpell{}
-	if isMainTarget { // off target doesnt need GCD
+	if isMainTarget && !isDrw { // off target doesnt need GCD
 		conf.ResourceType = stats.RunicPower
 		conf.BaseCost = float64(core.NewRuneCost(10, 1, 0, 0, 0))
 		conf.Cast = core.CastConfig{
@@ -53,17 +60,31 @@ func (dk *Deathknight) newHeartStrikeSpell(isMainTarget bool, onhit func(sim *co
 		conf.ApplyEffects = dk.withRuneRefund(rs, effect, false)
 	}
 
-	return dk.RegisterSpell(rs, conf)
+	if isDrw {
+		rs.Spell = dk.RuneWeapon.RegisterSpell(conf)
+		return rs
+	} else {
+		return dk.RegisterSpell(rs, conf)
+	}
 }
 
 func (dk *Deathknight) registerHeartStrikeSpell() {
-	dk.HeartStrike = dk.newHeartStrikeSpell(true, func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+	dk.HeartStrike = dk.newHeartStrikeSpell(true, false, func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
 		if dk.Env.GetNumTargets() > 1 {
 			dk.HeartStrikeOffHit.Cast(sim, dk.Env.NextTargetUnit(dk.CurrentTarget))
 		}
 		dk.LastOutcome = spellEffect.Outcome
 	})
-	dk.HeartStrikeOffHit = dk.newHeartStrikeSpell(false, nil)
+	dk.HeartStrikeOffHit = dk.newHeartStrikeSpell(false, false, nil)
+}
+
+func (dk *Deathknight) registerDrwHeartStrikeSpell() {
+	dk.RuneWeapon.HeartStrike = dk.newHeartStrikeSpell(true, true, func(sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+		if dk.Env.GetNumTargets() > 1 {
+			dk.RuneWeapon.HeartStrikeOffHit.Cast(sim, dk.Env.NextTargetUnit(dk.CurrentTarget))
+		}
+	}).Spell
+	dk.RuneWeapon.HeartStrikeOffHit = dk.newHeartStrikeSpell(false, true, nil).Spell
 }
 
 func (dk *Deathknight) CanHeartStrike(sim *core.Simulation) bool {

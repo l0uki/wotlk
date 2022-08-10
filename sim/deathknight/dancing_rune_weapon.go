@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/wowsims/wotlk/sim/core"
+	"github.com/wowsims/wotlk/sim/core/proto"
 	"github.com/wowsims/wotlk/sim/core/stats"
 )
 
@@ -12,12 +13,40 @@ func (dk *Deathknight) registerDancingRuneWeaponCD() {
 		return
 	}
 
-	duration := time.Second * 10
+	duration := time.Second * 12
+	if dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDancingRuneWeapon) {
+		duration += time.Second * 5
+	}
 
 	dancingRuneWeaponAura := dk.RegisterAura(core.Aura{
 		Label:    "Dancing Rune Weapon",
 		ActionID: core.ActionID{SpellID: 49028},
 		Duration: duration,
+
+		// Auto Attacks
+		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+			if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeMHAuto) {
+				return
+			}
+
+			dk.RuneWeapon.AutoAttacks.MHAuto.Cast(sim, spellEffect.Target)
+		},
+
+		// Casts
+		OnCastComplete: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell) {
+			switch spell {
+			case dk.IcyTouch.Spell:
+				dk.RuneWeapon.IcyTouch.Cast(sim, spell.Unit.CurrentTarget)
+			case dk.PlagueStrike.Spell:
+				dk.RuneWeapon.PlagueStrike.Cast(sim, spell.Unit.CurrentTarget)
+			case dk.DeathStrike.Spell:
+				dk.RuneWeapon.DeathStrike.Cast(sim, spell.Unit.CurrentTarget)
+			case dk.HeartStrike.Spell:
+				dk.RuneWeapon.HeartStrike.Cast(sim, spell.Unit.CurrentTarget)
+			case dk.DeathCoil.Spell:
+				dk.RuneWeapon.DeathCoil.Cast(sim, spell.Unit.CurrentTarget)
+			}
+		},
 	})
 
 	baseCost := float64(core.NewRuneCost(60.0, 0, 0, 0, 0))
@@ -45,6 +74,21 @@ func (dk *Deathknight) registerDancingRuneWeaponCD() {
 			dk.RuneWeapon.EnableWithTimeout(sim, dk.Gargoyle, duration)
 			dk.RuneWeapon.CancelGCDTimer(sim)
 
+			dk.RuneWeapon.PseudoStats.DamageDealtMultiplier = 0.5
+
+			// Probably not how it works but just for testing
+			//dk.RuneWeapon.PseudoStats.BonusMeleeCritRating = dk.PseudoStats.BonusMeleeCritRating
+			//dk.RuneWeapon.PseudoStats.BonusSpellCritRating = dk.PseudoStats.BonusSpellCritRating
+
+			// dk.RuneWeapon.PseudoStats.PhysicalDamageDealtMultiplier = dk.PseudoStats.PhysicalDamageDealtMultiplier
+			// dk.RuneWeapon.PseudoStats.DiseaseDamageDealtMultiplier = dk.PseudoStats.DiseaseDamageDealtMultiplier
+			// dk.RuneWeapon.PseudoStats.ShadowDamageDealtMultiplier = dk.PseudoStats.ShadowDamageDealtMultiplier
+			// dk.RuneWeapon.PseudoStats.FrostDamageDealtMultiplier = dk.PseudoStats.FrostDamageDealtMultiplier
+
+			// dk.RuneWeapon.PseudoStats.BonusMHArmorPenRating = dk.PseudoStats.BonusMHArmorPenRating
+			// dk.RuneWeapon.PseudoStats.BonusMHCritRating = dk.PseudoStats.BonusMHCritRating
+			// dk.RuneWeapon.PseudoStats.BonusMHExpertiseRating = dk.PseudoStats.BonusMHExpertiseRating
+
 			dancingRuneWeaponAura.Activate(sim)
 		},
 	})
@@ -61,10 +105,39 @@ func (dk *Deathknight) CastDancingRuneWeapon(sim *core.Simulation, target *core.
 	return false
 }
 
+func (runeWeapon *RuneWeaponPet) getImpurityBonus(hitEffect *core.SpellEffect, unit *core.Unit) float64 {
+	return hitEffect.MeleeAttackPower(unit) + hitEffect.MeleeAttackPowerOnTarget()
+}
+
 type RuneWeaponPet struct {
 	core.Pet
 
 	dkOwner *Deathknight
+
+	IcyTouch     *core.Spell
+	PlagueStrike *core.Spell
+
+	DeathStrike *core.Spell
+	DeathCoil   *core.Spell
+
+	HeartStrike       *core.Spell
+	HeartStrikeOffHit *core.Spell
+
+	// Diseases
+	FrostFeverSpell    *core.Spell
+	BloodPlagueSpell   *core.Spell
+	FrostFeverDisease  []*core.Dot
+	BloodPlagueDisease []*core.Dot
+}
+
+func (runeWeapon *RuneWeaponPet) Initialize() {
+	runeWeapon.dkOwner.registerDrwDiseaseDots()
+
+	runeWeapon.dkOwner.registerDrwIcyTouchSpell()
+	runeWeapon.dkOwner.registerDrwPlagueStrikeSpell()
+	runeWeapon.dkOwner.registerDrwDeathStrikeSpell()
+	runeWeapon.dkOwner.registerDrwHeartStrikeSpell()
+	runeWeapon.dkOwner.registerDrwDeathCoilSpell()
 }
 
 func (dk *Deathknight) NewRuneWeapon() *RuneWeaponPet {
@@ -85,7 +158,6 @@ func (dk *Deathknight) NewRuneWeapon() *RuneWeaponPet {
 		AutoSwingMelee: false,
 	})
 
-	runeWeapon.PseudoStats.DamageDealtMultiplier = 0.5
 	runeWeapon.PseudoStats.DamageTakenMultiplier = 0
 
 	dk.AddPet(runeWeapon)
@@ -95,10 +167,6 @@ func (dk *Deathknight) NewRuneWeapon() *RuneWeaponPet {
 
 func (runeWeapon *RuneWeaponPet) GetPet() *core.Pet {
 	return &runeWeapon.Pet
-}
-
-func (runeWeapon *RuneWeaponPet) Initialize() {
-	runeWeapon.registerSpellCasts()
 }
 
 func (runeWeapon *RuneWeaponPet) Reset(sim *core.Simulation) {
@@ -116,27 +184,12 @@ var runeWeaponBaseStats = stats.Stats{
 
 var runeWeaponStatInheritance = func(ownerStats stats.Stats) stats.Stats {
 	return stats.Stats{
-		stats.AttackPower: ownerStats[stats.AttackPower],
-		stats.MeleeHit:    ownerStats[stats.MeleeHit],
-		stats.MeleeCrit:   ownerStats[stats.MeleeCrit],
-		stats.Expertise:   ownerStats[stats.Expertise],
+		stats.AttackPower:      ownerStats[stats.AttackPower],
+		stats.MeleeHit:         ownerStats[stats.MeleeHit],
+		stats.MeleeCrit:        ownerStats[stats.MeleeCrit],
+		stats.SpellHit:         ownerStats[stats.SpellHit],
+		stats.SpellCrit:        ownerStats[stats.SpellCrit],
+		stats.Expertise:        ownerStats[stats.Expertise],
+		stats.ArmorPenetration: ownerStats[stats.ArmorPenetration],
 	}
-}
-
-func (runeWeapon *RuneWeaponPet) registerSpellCasts() {
-	core.MakePermanent(runeWeapon.dkOwner.RegisterAura(core.Aura{
-		Label: "Dancing Rune Weapon Listener",
-		// Auto Attacks
-		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeMHAuto) {
-				return
-			}
-
-			//runeWeapon.AutoAttacks.MHAuto.Cast(sim, spellEffect.Target)
-			runeWeapon.AutoAttacks.SwingMelee(sim, spellEffect.Target)
-		},
-		OnCastComplete: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell) {
-
-		},
-	}))
 }

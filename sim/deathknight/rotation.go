@@ -66,6 +66,13 @@ func (dk *Deathknight) RotationActionCallback_ERW(sim *core.Simulation, target *
 	return casted
 }
 
+func (dk *Deathknight) RotationActionCallback_DRW(sim *core.Simulation, target *core.Unit, s *Sequence) bool {
+	casted := dk.CastDancingRuneWeapon(sim, target)
+
+	s.ConditionalAdvance(casted)
+	return casted
+}
+
 func (dk *Deathknight) RotationActionCallback_Obli(sim *core.Simulation, target *core.Unit, s *Sequence) bool {
 	casted := dk.CastObliterate(sim, target)
 
@@ -98,6 +105,14 @@ func (dk *Deathknight) RotationActionCallback_BS(sim *core.Simulation, target *c
 
 func (dk *Deathknight) RotationActionCallback_HS(sim *core.Simulation, target *core.Unit, s *Sequence) bool {
 	casted := dk.CastHeartStrike(sim, target)
+	advance := dk.LastOutcome.Matches(core.OutcomeLanded)
+
+	s.ConditionalAdvance(casted && advance)
+	return casted
+}
+
+func (dk *Deathknight) RotationActionCallback_DS(sim *core.Simulation, target *core.Unit, s *Sequence) bool {
+	casted := dk.CastDeathStrike(sim, target)
 	advance := dk.LastOutcome.Matches(core.OutcomeLanded)
 
 	s.ConditionalAdvance(casted && advance)

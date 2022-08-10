@@ -73,6 +73,33 @@ func (dk *Deathknight) registerDeathStrikeSpell() {
 	dk.DeathStrike = dk.DeathStrikeMhHit
 }
 
+func (dk *Deathknight) registerDrwDeathStrikeSpell() {
+	bonusBaseDamage := dk.sigilOfAwarenessBonus(dk.DeathStrike)
+	weaponBaseDamage := core.BaseDamageFuncMeleeWeapon(core.MainHand, true, 297.0+bonusBaseDamage, 1.0, 0.75, true)
+
+	hasGlyph := dk.HasMajorGlyph(proto.DeathknightMajorGlyph_GlyphOfDeathStrike)
+
+	dk.RuneWeapon.DeathStrike = dk.RuneWeapon.RegisterSpell(core.SpellConfig{
+		ActionID:    DeathStrikeActionID.WithTag(1),
+		SpellSchool: core.SpellSchoolPhysical,
+		Flags:       core.SpellFlagMeleeMetrics,
+		ApplyEffects: core.ApplyEffectFuncDirectDamage(core.SpellEffect{
+			ProcMask:         core.ProcMaskMeleeSpecial,
+			BonusCritRating:  (dk.annihilationCritBonus() + dk.improvedDeathStrikeCritBonus()) * core.CritRatingPerCritChance,
+			DamageMultiplier: dk.improvedDeathStrikeDamageBonus(),
+			ThreatMultiplier: 1,
+			OutcomeApplier:   dk.RuneWeapon.OutcomeFuncMeleeWeaponSpecialHitAndCrit(dk.RuneWeapon.MeleeCritMultiplier(1.0, 0.0)),
+			BaseDamage: core.BaseDamageConfig{
+				Calculator: func(sim *core.Simulation, hitEffect *core.SpellEffect, spell *core.Spell) float64 {
+					bonusDamage := core.TernaryFloat64(hasGlyph, 1.0+core.MinFloat(0.25, dk.CurrentRunicPower()/100.0), 1.0)
+					return weaponBaseDamage(sim, hitEffect, spell) * bonusDamage
+				},
+				TargetSpellCoefficient: 1,
+			},
+		}),
+	})
+}
+
 func (dk *Deathknight) CanDeathStrike(sim *core.Simulation) bool {
 	return dk.CastCostPossible(sim, 0.0, 0, 1, 1) && dk.DeathStrike.IsReady(sim)
 }

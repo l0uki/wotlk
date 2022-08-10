@@ -92,8 +92,8 @@ func (dk *Deathknight) NewGargoyle() *GargoylePet {
 		Pet: core.NewPet(
 			"Gargoyle",
 			&dk.Character,
-			runeWeaponBaseStats,
-			runeWeaponStatInheritance,
+			gargoyleBaseStats,
+			gargoyleStatInheritance,
 			false,
 			true,
 		),

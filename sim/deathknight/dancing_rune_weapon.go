@@ -24,13 +24,13 @@ func (dk *Deathknight) registerDancingRuneWeaponCD() {
 		Duration: duration,
 
 		// Auto Attacks
-		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-			if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeMHAuto) {
-				return
-			}
+		// OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
+		// 	if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeMHAuto) {
+		// 		return
+		// 	}
 
-			dk.RuneWeapon.AutoAttacks.MHAuto.Cast(sim, spellEffect.Target)
-		},
+		// 	dk.RuneWeapon.AutoAttacks.MHAuto.Cast(sim, spellEffect.Target)
+		// },
 
 		// Casts
 		OnCastComplete: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell) {
@@ -155,9 +155,10 @@ func (dk *Deathknight) NewRuneWeapon() *RuneWeaponPet {
 
 	runeWeapon.EnableAutoAttacks(runeWeapon, core.AutoAttackOptions{
 		MainHand:       dk.WeaponFromMainHand(2),
-		AutoSwingMelee: false,
+		AutoSwingMelee: true,
 	})
 
+	runeWeapon.AutoAttacks.MH.SwingSpeed = 3.5
 	runeWeapon.PseudoStats.DamageTakenMultiplier = 0
 
 	dk.AddPet(runeWeapon)

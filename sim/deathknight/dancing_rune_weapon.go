@@ -22,16 +22,6 @@ func (dk *Deathknight) registerDancingRuneWeaponCD() {
 		Label:    "Dancing Rune Weapon",
 		ActionID: core.ActionID{SpellID: 49028},
 		Duration: duration,
-
-		// Auto Attacks
-		// OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, spellEffect *core.SpellEffect) {
-		// 	if !spellEffect.ProcMask.Matches(core.ProcMaskMeleeMHAuto) {
-		// 		return
-		// 	}
-
-		// 	dk.RuneWeapon.AutoAttacks.MHAuto.Cast(sim, spellEffect.Target)
-		// },
-
 		// Casts
 		OnCastComplete: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell) {
 			switch spell {
@@ -153,6 +143,9 @@ func (dk *Deathknight) NewRuneWeapon() *RuneWeaponPet {
 		dkOwner: dk,
 	}
 
+	runeWeapon.OnPetEnable = runeWeapon.enable
+	runeWeapon.OnPetDisable = runeWeapon.disable
+
 	runeWeapon.EnableAutoAttacks(runeWeapon, core.AutoAttackOptions{
 		MainHand:       dk.WeaponFromMainHand(2),
 		AutoSwingMelee: true,
@@ -176,6 +169,18 @@ func (runeWeapon *RuneWeaponPet) Reset(sim *core.Simulation) {
 func (runeWeapon *RuneWeaponPet) OnGCDReady(sim *core.Simulation) {
 	// No GCD system on Rune Weapon
 	runeWeapon.DoNothing()
+}
+
+func (runeWeapon *RuneWeaponPet) enable(sim *core.Simulation) {
+	// Snapshot extra % speed modifiers from dk owner
+	runeWeapon.PseudoStats.MeleeSpeedMultiplier = 1
+	runeWeapon.MultiplyMeleeSpeed(sim, runeWeapon.dkOwner.PseudoStats.MeleeSpeedMultiplier)
+}
+
+func (runeWeapon *RuneWeaponPet) disable(sim *core.Simulation) {
+	// Clear snapshot speed
+	runeWeapon.PseudoStats.MeleeSpeedMultiplier = 1
+	runeWeapon.MultiplyMeleeSpeed(sim, 1)
 }
 
 // These numbers are just rough guesses

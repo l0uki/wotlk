@@ -45,11 +45,13 @@ export const StandardTalents = {
 
 export const DefaultRotation = BalanceDruidRotation.create({
     type: RotationType.Adaptive,
-    useBattleRes: true,
-    isInsideEclipseThreshold: 15,
-    mfInsideEclipseThreshold: 14,
-    useIs: false,
-    useMf: true,
+    useBattleRes: false,
+    useIs: true,
+    useMf: false,
+    isInsideEclipseThreshold: 14,
+    mfInsideEclipseThreshold: 0,
+    mcdInsideLunarThreshold: 15,
+    mcdInsideSolarThreshold: 15
 });
 
 export const DefaultOptions = BalanceDruidOptions.create({

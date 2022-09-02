@@ -1,7 +1,6 @@
 package balance
 
 import (
-	"github.com/wowsims/wotlk/sim/common"
 	"github.com/wowsims/wotlk/sim/core"
 	"github.com/wowsims/wotlk/sim/core/items"
 	"github.com/wowsims/wotlk/sim/core/proto"
@@ -42,20 +41,23 @@ func NewBalanceDruid(character core.Character, options proto.Player) *BalanceDru
 
 	moonkin.ResetTalentsBonuses()
 	moonkin.RegisterTalentsBonuses()
+	moonkin.RegisterCooldownRankings()
 	moonkin.EnableResumeAfterManaWait(moonkin.tryUseGCD)
 	return moonkin
+}
+
+type BalanceCooldown struct {
+	Name string
+	Stat string
+	ID   int32
 }
 
 type BalanceDruid struct {
 	*druid.Druid
 
-	Rotation proto.BalanceDruid_Rotation
-	// These are only used when primary spell is set to 'Adaptive'. When the mana
-	// tracker tells us we have extra mana to spare, use surplusRotation instead of
-	// primaryRotation.
-	useSurplusRotation bool
-	surplusRotation    proto.BalanceDruid_Rotation
-	manaTracker        common.ManaSpendingRateTracker
+	Rotation         proto.BalanceDruid_Rotation
+	CooldownsRanking []BalanceCooldown
+
 	// CDS
 	hyperSpeedMCD *core.MajorCooldown
 	potionMCD     *core.MajorCooldown
@@ -64,7 +66,6 @@ type BalanceDruid struct {
 	potionUsed    bool
 }
 
-// GetDruid is to implement druid.Agent (supports nordrassil set bonus)
 func (moonkin *BalanceDruid) GetDruid() *druid.Druid {
 	return moonkin.Druid
 }
@@ -75,13 +76,12 @@ func (moonkin *BalanceDruid) Initialize() {
 }
 
 func (moonkin *BalanceDruid) Reset(sim *core.Simulation) {
-	if moonkin.useSurplusRotation {
-		moonkin.manaTracker.Reset()
-	}
 	moonkin.Druid.Reset(sim)
 	moonkin.RebirthTiming = moonkin.Env.BaseDuration.Seconds() * sim.RandomFloat("Rebirth Timing")
 
 	if moonkin.Rotation.McdInsideLunarThreshold > 0 || moonkin.Rotation.McdInsideSolarThreshold > 0 {
+		// Add Potions, Gloves and Trinkets MCD to an array via moonkin.getBalanceMajorCooldown
+		// Sort this array depending on moonkin.CooldownRankings
 		moonkin.potionUsed = false
 		consumes := &moonkin.Consumes
 		if consumes.DefaultPotion == proto.Potions_PotionOfSpeed {
@@ -105,4 +105,24 @@ func (moonkin *BalanceDruid) getBalanceMajorCooldown(actionID core.ActionID) *co
 		return majorCd
 	}
 	return nil
+}
+
+func (moonkin *BalanceDruid) RegisterCooldownRankings() {
+	moonkin.CooldownsRanking = []BalanceCooldown{
+		{
+			Name: "Potion of Speed",
+			Stat: "haste",
+			ID:   40211,
+		},
+		{
+			Name: "Potion of Wild Magic",
+			Stat: "crit",
+			ID:   40212,
+		},
+		{
+			Name: "Potion of Wild Magic",
+			Stat: "haste",
+			ID:   54758,
+		},
+	}
 }

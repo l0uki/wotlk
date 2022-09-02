@@ -105,20 +105,36 @@ func (moonkin *BalanceDruid) castAllMajorCooldowns(sim *core.Simulation) {
 	moonkin.castMajorCooldown(moonkin.potionMCD, sim, target)
 	moonkin.castMajorCooldown(moonkin.onUseTrinket1, sim, target)
 	moonkin.castMajorCooldown(moonkin.onUseTrinket2, sim, target)
+	// Iterate and Use all Cooldowns following sort order from balance.go
 }
 
 func (moonkin *BalanceDruid) castMajorCooldown(mcd *core.MajorCooldown, sim *core.Simulation, target *core.Unit) {
 	if mcd != nil {
 		isOffensivePotion := mcd.Spell.SameAction(core.ActionID{ItemID: 40211}) || mcd.Spell.SameAction(core.ActionID{ItemID: 40212})
-		shouldUseOffensivePotion := isOffensivePotion && !moonkin.potionUsed
+		willUseOffensivePotion := isOffensivePotion && !moonkin.potionUsed
 
+		isHasteCD := mcd.Spell.SameAction(core.ActionID{ItemID: 40211}) || mcd.Spell.SameAction(core.ActionID{SpellID: 54758})
+		isCritCD := mcd.Spell.SameAction(core.ActionID{ItemID: 40212})
+
+		lunarIsActive := moonkin.LunarICD.Timer.TimeToReady(sim) > time.Millisecond*15000
+		solarIsActive := moonkin.SolarICD.Timer.TimeToReady(sim) > time.Millisecond*15000
+
+		if lunarIsActive && isCritCD {
+			return
+		}
+		if solarIsActive && isHasteCD {
+			return
+		}
 		if isOffensivePotion && moonkin.potionUsed {
 			return
 		}
 
+		// Use Potion if we can
+		// Use Cooldown if appropriate Eclipse
+
 		if mcd.Spell.IsReady(sim) && moonkin.GCD.IsReady(sim) {
 			mcd.Spell.Cast(sim, target)
-			if shouldUseOffensivePotion {
+			if willUseOffensivePotion {
 				moonkin.potionUsed = true
 			}
 		}

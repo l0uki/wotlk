@@ -171,7 +171,7 @@ func (warlock *Warlock) registerCurseOfDoomSpell() {
 	effect := core.SpellEffect{
 		ThreatMultiplier: 1 - 0.1*float64(warlock.Talents.ImprovedDrainSoul),
 		DamageMultiplier: baseAdditiveMultiplier,
-		BaseDamage:       core.BaseDamageConfigMagicNoRoll(7300, 2),
+		BaseDamage:       core.BaseDamageConfigMagicNoRoll(7300/2, 2),
 		OutcomeApplier:   warlock.OutcomeFuncTick(),
 		ProcMask:         core.ProcMaskPeriodicDamage,
 	}

@@ -212,7 +212,7 @@ func (warlock *Warlock) registerCurseOfDoomSpell() {
 			ActionID: actionID,
 		}),
 		NumberOfTicks: 2,
-		TickLength:    time.Second * 60,
+		TickLength:    time.Second * 30,
 		TickEffects:   core.TickFuncSnapshot(target, effect),
 	})
 }

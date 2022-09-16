@@ -211,8 +211,8 @@ func (warlock *Warlock) registerCurseOfDoomSpell() {
 			Label:    "CurseofDoom-" + strconv.Itoa(int(warlock.Index)),
 			ActionID: actionID,
 		}),
-		NumberOfTicks: 1,
-		TickLength:    time.Minute,
+		NumberOfTicks: 2,
+		TickLength:    time.Seconds*30,
 		TickEffects:   core.TickFuncSnapshot(target, effect),
 	})
 }
